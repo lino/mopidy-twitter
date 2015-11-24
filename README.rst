@@ -18,7 +18,7 @@ Mopidy-TwitterDJ
    :target: https://coveralls.io/r/lino/mopidy-twitterdj
    :alt: Test coverage
 
-Controls Spotify via Twitter
+Controls Mopidy via Twitter
 
 
 Installation
@@ -39,7 +39,8 @@ Before starting Mopidy, you must add configuration for
 Mopidy-TwitterDJ to your Mopidy configuration file::
 
     [twitterdj]
-    # TODO: Add example of extension config
+    token = YOUR-TWITTER-OAUTH-TOKEN
+    secret = YOUR-TWITTER-OAUTH-SECRET
 
 
 Project resources
