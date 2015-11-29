@@ -39,8 +39,13 @@ Before starting Mopidy, you must add configuration for
 Mopidy-TwitterDJ to your Mopidy configuration file::
 
     [twitterdj]
+    enabled = true
     token = YOUR-TWITTER-OAUTH-TOKEN
     secret = YOUR-TWITTER-OAUTH-SECRET
+    consumerkey = YOURKEY
+    consumersecret = YOURCONSUMERSECRET
+    username = TWITTER-USERNAME
+    playlist = SPOTIFY-PLAYLIST-URI
 
 
 Project resources
