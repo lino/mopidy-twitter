@@ -30,15 +30,14 @@ class Extension(ext.Extension):
 
     def get_config_schema(self):
         schema = super(Extension, self).get_config_schema()
-        # TODO: Comment in and edit, or remove entirely
+        schema['consumerkey'] = config.String()
+        schema['consumersecret'] = config.Secret()
         schema['token'] = config.String()
         schema['secret'] = config.Secret()
+        schema['username'] = config.String()
+        schema['playlist'] = config.String()
         return schema
 
     def setup(self, registry):
-        # You will typically only implement one of the following things
-        # in a single extension.
-
-        # TODO: Edit or remove entirely
         from .frontend import TwitterDJFrontend
         registry.add('frontend', TwitterDJFrontend)
