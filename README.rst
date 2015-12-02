@@ -58,7 +58,13 @@ Project resources
 Changelog
 =========
 
-v0.1.0 (UNRELEASED)
+v0.1.1
+----------------------------------------
+
+- Fixed a threading bug in certain python environments
+
+
+v0.1.0
 ----------------------------------------
 
 - Initial release.
