@@ -44,6 +44,7 @@ Mopidy-TwitterDJ to your Mopidy configuration file::
 
     [twitterdj]
     enabled = true
+    master = true
     token = YOUR-TWITTER-OAUTH-TOKEN
     secret = YOUR-TWITTER-OAUTH-SECRET
     consumerkey = YOURKEY
@@ -51,6 +52,9 @@ Mopidy-TwitterDJ to your Mopidy configuration file::
     username = TWITTER-USERNAME
     playlist = SPOTIFY-PLAYLIST-URI
 
+Only one instance must be master=true - the others are just playing the playlist.
+token, secret, consumerkey, consumersecret and username are disregarded on nodes
+that are not master.
 
 Project resources
 =================
@@ -61,6 +65,11 @@ Project resources
 
 Changelog
 =========
+
+v0.1.5
+----------------------------------------
+
+- Added slave mode
 
 v0.1.4
 ----------------------------------------
