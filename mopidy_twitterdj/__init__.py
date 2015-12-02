@@ -36,6 +36,7 @@ class Extension(ext.Extension):
         schema['secret'] = config.Secret()
         schema['username'] = config.String()
         schema['playlist'] = config.String()
+        schema['master'] = config.Boolean()
         return schema
 
     def setup(self, registry):

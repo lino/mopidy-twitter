@@ -1,13 +1,11 @@
 import pykka
 import logging
 import thread
-import types
-
+import threading
 from datetime import datetime, timedelta
 from email.utils import parsedate_tz
 from mopidy import core
-from twython import Twython, TwythonStreamer
-from collections import deque
+from twython import TwythonStreamer
 from mopidy.audio import PlaybackState
 
 
@@ -126,8 +124,7 @@ class InputQueue(pykka.ThreadingActor):
         results = self.core.library.search({'artist': [artist],'track_name':[track]}, uris=['spotify:']).get()
         for result in results:
             if result.tracks and len(result.tracks) > 0:
-                self.log.info('TwitterDJ is feeling lucky and will queue ' + result.tracks[0].name)
-                self.queue(result.tracks[0])
+                self.log.info('TwitterDJ is feeling lucky and will queue %s - %s', result.tracks[0].artists, result.tracks[0].name)
                 self.add_to_playlist(result.tracks[0])
                 self.log.info('Tracks in list: '+str(len(self.core.tracklist.get_tl_tracks().get())))
                 self.play()
@@ -140,9 +137,14 @@ class InputQueue(pykka.ThreadingActor):
 
     def add_to_playlist(self, track):
         playlist = self.get_playlist()
-        appended_tracks = list(playlist.tracks) + [track]
-        playlist = playlist.copy(tracks=appended_tracks)
-        self.core.playlists.save(playlist)
+        appended_tracks = list(playlist.tracks)
+        if track not in appended_tracks:
+            appended_tracks.append(track)
+            playlist = playlist.copy(tracks=appended_tracks)
+            self.core.playlists.save(playlist)
+            self.queue(track)
+        else:
+            self.log.info('Track %s - %s already in playlist', track.artists, track.name)
 
     def play(self):
         state = self.core.playback.get_state().get()
@@ -175,19 +177,27 @@ class TwitterDJFrontend(pykka.ThreadingActor, core.CoreListener):
         self.username = self.username.lower()
         self.playlist = None
         self.playlistUri = config['twitterdj']['playlist']
+        self.master = config['twitterdj']['master']
         self.queue_ref = None
         self.twitter_source = None
+        self.playlistPosition = 0
 
     def on_start(self):
         self.log.info('Starting TwitterDJ')
-        self.update_time()
-        self.queue_ref = InputQueue.start(core=self.core, username=self.username, playlist=self.playlistUri)
-        self.twitter_source = TwitterSource.start(config=self.config, queue_ref=self.queue_ref)
+        if self.master:
+            self.update_time()
+            self.queue_ref = InputQueue.start(core=self.core, username=self.username, playlist=self.playlistUri)
+            self.twitter_source = TwitterSource.start(config=self.config, queue_ref=self.queue_ref)
+        else:
+            self.log.info("TwitterDJ running in slave mode: Playing shared playlist")
+            self.play_playlist()
 
     def on_stop(self):
         self.log.info('Stopping TwitterDJ')
-        self.twitter_source.stop()
-        self.queue_ref.stop()
+        if self.twitter_source:
+            self.twitter_source.stop()
+        if self.queue_ref:
+            self.queue_ref.stop()
 
     def update_time(self):
         self.last_event = datetime.now()
@@ -196,8 +206,63 @@ class TwitterDJFrontend(pykka.ThreadingActor, core.CoreListener):
     def play(self):
         self.core.playback.play()
 
-    def find_next(self):
-        try:
-            next = self.queue.popleft()
-        except IndexError:
-            self.log.info('TwitterDJ has nothing to find')
+    def play_playlist(self):
+        self.core.tracklist.clear()
+        playlist = self.core.playlists.lookup(self.playlistUri).get()
+        self.core.tracklist.add(playlist.tracks)
+        self.play()
+
+        if len(playlist.tracks) == 0:
+            self.log.info('** Playlist empty. Waiting 5s')
+            threading.Timer(5.0, self.play_playlist).start()
+        else:
+            self.log.info('Tracks in list: %s', len(self.core.tracklist.get_tl_tracks().get()))
+
+    def check_while_waiting(self):
+        playlist = self.core.playlists.lookup(self.playlistUri).get()
+        tracklist = self.core.tracklist.get_tl_tracks().get()
+        if len(tracklist) > 0:
+            last_track = tracklist[-1].track
+        else:
+            last_track = None
+        self.core.tracklist.clear()
+        self.core.tracklist.add(tracks=playlist.tracks)
+        tracklist = self.core.tracklist.get_tl_tracks().get()
+        if last_track:
+            if playlist.tracks.index(last_track) < len(playlist.tracks) -1: # new tracks available
+                last_tracks = self.core.tracklist.filter(uri=[last_track.uri]).get()
+                if len(last_tracks) > 0:
+                    self.core.playback.play(tl_track=tracklist[tracklist.index(last_tracks[0])+1])
+            else:
+                threading.Timer(5.0, self.check_while_waiting).start()
+                self.log.info('** Waiting to resume playback')
+        else:
+            if len(tracklist) == 0:
+                threading.Timer(5.0, self.check_while_waiting).start()
+                self.log.info('** Nothing to play')
+            else:
+                self.play()
+                self.log.info('** Finally something to play')
+
+    def refresh_playlist(self):
+        playlist = self.core.playlists.lookup(self.playlistUri).get()
+        tracklist = self.core.tracklist.get_tl_tracks().get()
+        current_idx = self.core.tracklist.index().get()
+        current_pl_idx = playlist.tracks.index(tracklist[current_idx].track)
+        if current_pl_idx: # selected track available
+            non_current_tracks = tracklist
+            del non_current_tracks[current_idx]
+            tlids_to_remove = map(lambda tltrack : tltrack.tlid, non_current_tracks)
+            self.core.tracklist.remove({'tlid':tlids_to_remove})
+            self.core.tracklist.add(tracks=playlist.tracks[:current_pl_idx],at_position=0)
+            self.core.tracklist.add(tracks=playlist.tracks[current_pl_idx+1:])
+
+    def track_playback_started(self, tl_track):
+        self.refresh_playlist()
+        self.log.info('** PLAY %s - %s ', tl_track.track.artists, tl_track.track.name)
+
+    def track_playback_ended(self, tl_track, time_position):
+        self.log.info('** END %s - %s ', tl_track.track.artists, tl_track.track.name)
+        if self.core.tracklist.index(tl_track).get() == (self.core.tracklist.get_length().get() - 1):
+            threading.Timer(5.0, self.check_while_waiting).start()
+            self.log.info('** Waiting for new tracks')
