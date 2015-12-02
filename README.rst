@@ -31,6 +31,10 @@ Install by running::
 Or, if available, install the Debian/Ubuntu package from `apt.mopidy.com
 <http://apt.mopidy.com/>`_.
 
+Spotify list saving requires my version of the mopidy-spotify plugin, install it via
+
+pip install git+https://github.com/lino/mopidy-spotify.git
+
 
 Configuration
 =============
