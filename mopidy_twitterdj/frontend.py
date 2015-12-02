@@ -8,6 +8,7 @@ from email.utils import parsedate_tz
 from mopidy import core
 from twython import Twython, TwythonStreamer
 from collections import deque
+from mopidy.audio import PlaybackState
 
 
 def to_datetime(datestring):
@@ -91,13 +92,11 @@ class InputQueue(pykka.ThreadingActor):
         super(InputQueue, self).__init__()
         self.username = username
         self.core = core
-        self.playlist = None
         self.playlistUri = playlist
         self.log = logging.getLogger('mopidy_twitterdj_queue')
 
     def on_start(self):
         self.log.info('TwitterDJ Queue is starting')
-        #self.update_playlist()
 
     def on_stop(self):
         self.log.info('TwitterDJ Queue is stopping')
@@ -129,6 +128,7 @@ class InputQueue(pykka.ThreadingActor):
             if result.tracks and len(result.tracks) > 0:
                 self.log.info('TwitterDJ is feeling lucky and will queue ' + result.tracks[0].name)
                 self.queue(result.tracks[0])
+                self.add_to_playlist(result.tracks[0])
                 self.log.info('Tracks in list: '+str(len(self.core.tracklist.get_tl_tracks().get())))
                 self.play()
             else:
@@ -138,19 +138,30 @@ class InputQueue(pykka.ThreadingActor):
     def queue(self, track):
         self.core.tracklist.add([track])
 
+    def add_to_playlist(self, track):
+        playlist = self.get_playlist()
+        appended_tracks = list(playlist.tracks) + [track]
+        playlist = playlist.copy(tracks=appended_tracks)
+        self.core.playlists.save(playlist)
+
     def play(self):
         state = self.core.playback.get_state().get()
-        if state == 'STOPPED':
+        if state == PlaybackState.STOPPED:
             self.core.playback.play()
-        elif state == 'PAUSED':
+        elif state == PlaybackState.PAUSED:
             self.core.playback.resume()
-        elif state == 'PLAYING':
+        elif state == PlaybackState.PLAYING:
             return
 
+    def get_playlist(self):
+        """
+        :rtype: :class:`mopidy.models.Playlist` or :class:`None`
+        """
+        return self.core.playlists.lookup(self.playlistUri).get()
+
     def update_playlist(self):
-        self.log.info('TwitterDJ: updating playlist')
+        self.log.info('TwitterDJ: updating playlists')
         self.core.playlists.refresh()
-        self.playlist = self.core.playlists.lookup(self.playlistUri).get()
 
 
 class TwitterDJFrontend(pykka.ThreadingActor, core.CoreListener):
@@ -177,7 +188,6 @@ class TwitterDJFrontend(pykka.ThreadingActor, core.CoreListener):
         self.log.info('Stopping TwitterDJ')
         self.twitter_source.stop()
         self.queue_ref.stop()
-
 
     def update_time(self):
         self.last_event = datetime.now()

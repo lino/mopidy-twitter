@@ -58,6 +58,11 @@ Project resources
 Changelog
 =========
 
+v0.1.4
+----------------------------------------
+
+- Added spotify playlist saving
+
 v0.1.3
 ----------------------------------------
 
