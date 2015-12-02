@@ -90,8 +90,6 @@ class TwitterSource(pykka.ThreadingActor):
         self.log.info('Listening to mentions of @'+ self.username)
         pool = Pool(processes=1)              # Start a worker processes.
         pool.apply_async(self.twitterstream.user, [], None)
-        pool.close()
-        pool.join()
 
 def on_stop(self):
         self.log.info('TwitterDJ Streamer is stopping')
