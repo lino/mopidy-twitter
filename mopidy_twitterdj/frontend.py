@@ -1,13 +1,12 @@
 import pykka
 import logging
-import copy_reg
+import thread
 import types
 
 from datetime import datetime, timedelta
 from email.utils import parsedate_tz
 from mopidy import core
 from twython import Twython, TwythonStreamer
-from multiprocessing import Pool
 from collections import deque
 
 
@@ -15,14 +14,6 @@ def to_datetime(datestring):
     time_tuple = parsedate_tz(datestring.strip())
     dt = datetime(*time_tuple[:6])
     return dt - timedelta(seconds=time_tuple[-1])
-
-def _pickle_method(m):
-    if m.im_self is None:
-        return getattr, (m.im_class, m.im_func.func_name)
-    else:
-        return getattr, (m.im_self, m.im_func.func_name)
-
-copy_reg.pickle(types.MethodType, _pickle_method)
 
 
 class UserStreamer(TwythonStreamer):
@@ -88,8 +79,7 @@ class TwitterSource(pykka.ThreadingActor):
         self.log.info('TwitterDJ Streamer is starting')
         self.twitterstream = UserStreamer(self.username, self.queue_ref, self.consumerkey, self.consumersecret, self.token, self.secret)
         self.log.info('Listening to mentions of @'+ self.username)
-        pool = Pool(processes=1)              # Start a worker processes.
-        pool.apply_async(self.twitterstream.user, [], None)
+        thread.start_new_thread(self.twitterstream.user, ())
 
 def on_stop(self):
         self.log.info('TwitterDJ Streamer is stopping')

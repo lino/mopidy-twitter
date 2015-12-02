@@ -58,6 +58,16 @@ Project resources
 Changelog
 =========
 
+v0.1.3
+----------------------------------------
+
+- Changed threading approach
+
+v0.1.2
+----------------------------------------
+
+- Fixed another threading bug
+
 v0.1.1
 ----------------------------------------
 
