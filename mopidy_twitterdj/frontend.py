@@ -78,6 +78,7 @@ class TwitterSource(pykka.ThreadingActor):
         self.log.info('TwitterDJ Streamer is starting')
         self.twitterstream = UserStreamer(self.username, self.queue_ref, self.consumerkey, self.consumersecret, self.token, self.secret)
         self.log.info('Listening to mentions of @'+ self.username)
+
         thread.start_new_thread(self.twitterstream.user, ())
 
 def on_stop(self):
@@ -248,7 +249,11 @@ class TwitterDJFrontend(pykka.ThreadingActor, core.CoreListener):
         playlist = self.core.playlists.lookup(self.playlistUri).get()
         tracklist = self.core.tracklist.get_tl_tracks().get()
         current_idx = self.core.tracklist.index().get()
-        current_pl_idx = playlist.tracks.index(tracklist[current_idx].track)
+        try:
+            current_pl_idx = playlist.tracks.index(tracklist[current_idx].track)
+        except ValueError:
+            current_pl_idx = None
+
         if current_pl_idx: # selected track available
             non_current_tracks = tracklist
             del non_current_tracks[current_idx]

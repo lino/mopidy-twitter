@@ -66,6 +66,11 @@ Project resources
 Changelog
 =========
 
+v0.1.6
+----------------------------------------
+
+- Added twitter replies on playback
+
 v0.1.5
 ----------------------------------------
 
